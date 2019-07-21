@@ -1,6 +1,7 @@
 package core
 
 import (
+	"net/http"
 	"strings"
 )
 
@@ -20,26 +21,35 @@ const (
 )
 
 type HttpHandler struct {
-	Path    string
+	Route   *Route
 	Methods map[HttpMethod]bool
 	Handle  Handler
 }
 
 // Handler's path equals to other's and HTTP methods have intersection
-func (r *HttpHandler) Conflict(other *HttpHandler) bool {
-	if r.Path == other.Path {
-		for k := range r.Methods {
-			if _, ok := other.Methods[k]; ok {
-				return true
-			}
+func (h *HttpHandler) Conflict(other *HttpHandler) bool {
+	if h.Route.Equals(other.Route) {
+		return h.HasInterMethod(other)
+	}
+
+	return false
+}
+
+func (h *HttpHandler) HasInterMethod(other *HttpHandler) bool {
+	for k := range h.Methods {
+		if _, ok := other.Methods[k]; ok {
+			return true
 		}
 	}
 
 	return false
 }
 
-func (r *HttpHandler) Match(path string, method string) bool {
-	if r.Path != path {
+func (h *HttpHandler) Match(request *http.Request) bool {
+	path := request.URL.Path
+	method := request.Method
+
+	if !h.Route.PathReg.MatchString(path) {
 		return false
 	}
 
@@ -56,9 +66,21 @@ func (r *HttpHandler) Match(path string, method string) bool {
 	}
 
 	if -1 != httpMethod {
-		// Have conflict means matched
-		return r.Conflict(&HttpHandler{Path: path, Methods: map[HttpMethod]bool{httpMethods[httpMethod]: true}})
+		hasInter := h.HasInterMethod(&HttpHandler{Methods: map[HttpMethod]bool{httpMethods[httpMethod]: true}})
+		if !hasInter {
+			return false
+		}
 	}
 
-	return false
+	if e := request.ParseForm(); e != nil {
+		return false
+	} else {
+		for k := range h.Route.Params {
+			if _, ok := request.Form[k]; !ok {
+				return false
+			}
+		}
+	}
+
+	return true
 }

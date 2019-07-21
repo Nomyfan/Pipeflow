@@ -2,26 +2,35 @@ package flow
 
 import (
 	"pipeflow/core"
+	"pipeflow/errors"
+	"pipeflow/middlewares"
 	"strings"
 )
 import "net/http"
 
 type Flow struct {
+	cors       core.RunnableMiddleware
 	handlers   []core.HttpHandler
 	middleware []core.Middleware
-	dispatcher *core.HttpHandlerDispatcher
+	dispatcher *middlewares.HttpHandlerDispatcher
 }
 
 func (flow Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
 	ctx := core.HttpContext{Request: res, ResponseWriter: writer}
-	breaker := false
+	toBreak := false
+
 	for _, v := range flow.middleware {
 		if !v.Handle(ctx) {
-			breaker = true
+			toBreak = true
 			break
 		}
 	}
-	if !breaker {
+
+	if nil != flow.cors {
+		flow.cors.Handle(ctx)
+	}
+
+	if !toBreak {
 		flow.dispatcher.Handle(ctx)
 	}
 }
@@ -30,7 +39,7 @@ func NewFlow() Flow {
 	flow := Flow{}
 	flow.handlers = []core.HttpHandler{}
 	flow.middleware = []core.Middleware{}
-	flow.dispatcher = &core.HttpHandlerDispatcher{Handlers: &flow.handlers}
+	flow.dispatcher = &middlewares.HttpHandlerDispatcher{Handlers: &flow.handlers}
 
 	return flow
 }
@@ -42,45 +51,59 @@ func (flow *Flow) Use(middleware core.Middleware) {
 	}
 }
 
-type wrappedMiddleware struct {
+type runnableMiddleware struct {
 	Handler func(ctx core.HttpContext)
 }
 
-func (wmw *wrappedMiddleware) Handle(ctx core.HttpContext) bool {
-	wmw.Handler(ctx)
+func (rm *runnableMiddleware) Handle(ctx core.HttpContext) bool {
+	rm.Handler(ctx)
 	return true
 }
 
 // Runnable middleware always returns true
 func (flow *Flow) Run(middleware core.RunnableMiddleware) {
-	// Register middleware
 	if nil != middleware {
-		flow.Use(&wrappedMiddleware{Handler: middleware.Handle})
+		flow.Use(&runnableMiddleware{Handler: middleware.Handle})
 	}
 }
 
-func (flow *Flow) AddHandler(path string, handler core.Handler, methods []core.HttpMethod) bool {
+func (flow *Flow) UseCors(origins []string, methods []string, headers []string, expose []string) {
+	cors := middlewares.Cors{AllowedOrigins: map[string]bool{}, AllowedMethods: methods, AllowedHeaders: headers, ExposedHeaders: expose}
+	if nil != origins {
+		for _, v := range origins {
+			cors.AllowedOrigins[v] = true
+		}
+	}
+	flow.cors = &cors
+}
+
+func (flow *Flow) Register(path string, handler core.Handler, methods []core.HttpMethod) error {
 	path = strings.Trim(path, " ")
-	if "" == path || path[0] != '/' || nil == methods || nil == handler {
-		return false
+	if "" == path || path[0] != '/' || nil == methods || len(methods) == 0 || nil == handler {
+		return errors.BasicError{Message: "Args given are not valid"}
 	}
 
-	httpHandler := core.HttpHandler{Path: path, Handle: handler, Methods: map[core.HttpMethod]bool{}}
+	route, err := core.BuildRoute(path)
+	if err != nil {
+		return err
+	}
+
+	httpHandler := core.HttpHandler{Route: &route, Handle: handler, Methods: map[core.HttpMethod]bool{}}
 	for _, v := range methods {
 		httpHandler.Methods[v] = true
 	}
 
-	if !flow.checkConflict(&httpHandler) {
-		flow.appendHandler(httpHandler)
-		return true
+	if flow.checkConflict(&httpHandler) {
+		return errors.BasicError{Message: "This handler conflicts with existing one"}
 	}
 
-	return false
+	flow.appendHandler(httpHandler)
+	return nil
 }
 
 func (flow *Flow) checkConflict(handler *core.HttpHandler) bool {
-	for _, v := range flow.handlers {
-		if v.Conflict(handler) {
+	for _, h := range flow.handlers {
+		if h.Conflict(handler) {
 			return true
 		}
 	}
@@ -89,7 +112,6 @@ func (flow *Flow) checkConflict(handler *core.HttpHandler) bool {
 }
 
 func (flow *Flow) appendHandler(handler core.HttpHandler) {
-	// Append handler and update dispatcher's handlers ref
 	flow.handlers = append(flow.handlers, handler)
 	flow.dispatcher.Handlers = &flow.handlers
 }
