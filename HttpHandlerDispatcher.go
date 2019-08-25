@@ -1,16 +1,15 @@
-package middlewares
+package pipeflow
 
 import (
 	"fmt"
-	"pipeflow/core"
 )
 
 // HttpHandlerDispatcher is a middleware in the end point of workflow
 type HttpHandlerDispatcher struct {
-	Handlers *[]core.HttpHandler
+	Handlers *[]HttpHandler
 }
 
-func (hd *HttpHandlerDispatcher) Handle(ctx core.HttpContext) bool {
+func (hd *HttpHandlerDispatcher) Handle(ctx HttpContext) bool {
 	for _, v := range *hd.Handlers {
 		if v.Match(ctx.Request) {
 			getPathVars(&v, &ctx)
@@ -24,7 +23,7 @@ func (hd *HttpHandlerDispatcher) Handle(ctx core.HttpContext) bool {
 	return false
 }
 
-func getPathVars(handler *core.HttpHandler, ctx *core.HttpContext) {
+func getPathVars(handler *HttpHandler, ctx *HttpContext) {
 	regex := handler.Route.PathReg
 
 	vars := regex.FindAllStringSubmatch(ctx.Request.URL.Path, -1)

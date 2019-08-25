@@ -1,4 +1,4 @@
-package core
+package pipeflow
 
 import "net/http"
 

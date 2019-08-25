@@ -1,4 +1,4 @@
-package errors
+package pipeflow
 
 type BasicError struct {
 	Message string

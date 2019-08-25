@@ -1,4 +1,4 @@
-package core
+package pipeflow
 
 import (
 	"net/http"
@@ -26,7 +26,7 @@ type HttpHandler struct {
 	Handle  Handler
 }
 
-// Handler's path equals to other's and HTTP methods have intersection
+// Conflict checks handler's path equals to other's and HTTP methods have intersection
 func (h *HttpHandler) Conflict(other *HttpHandler) bool {
 	if h.Route.Equals(other.Route) {
 		return h.HasInterMethod(other)

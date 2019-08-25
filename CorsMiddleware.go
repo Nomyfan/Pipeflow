@@ -1,7 +1,6 @@
-package middlewares
+package pipeflow
 
 import (
-	"pipeflow/core"
 	"strings"
 )
 
@@ -12,9 +11,8 @@ type Cors struct {
 	ExposedHeaders []string
 }
 
-// Cors runs after any middleware and before dispatcher middleware
-func (cors *Cors) Handle(ctx core.HttpContext) {
-
+func (cors *Cors) Handle(ctx HttpContext) {
+	// Cors runs after any middleware and before dispatcher middleware
 	origin := ctx.Request.Header.Get("Origin")
 	enabled := false
 	if _, ok := cors.AllowedOrigins["*"]; ok {
