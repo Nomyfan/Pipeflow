@@ -5,12 +5,14 @@ import (
 	"strings"
 )
 
+// Route is used to identify a route
 type Route struct {
 	PathReg *regexp.Regexp
 	Params  map[string]bool
 	Vars    map[string]bool
 }
 
+// BuildRoute builds a route from given pattern
 func BuildRoute(pattern string) (Route, error) {
 	route := Route{}
 	err := parse(pattern, &route)
@@ -21,6 +23,11 @@ func BuildRoute(pattern string) (Route, error) {
 func parse(pattern string, route *Route) error {
 	if len(pattern) == 0 {
 		return BasicError{Message: "Path should not be empty"}
+	}
+
+	if "/" == pattern {
+		route.PathReg = regexp.MustCompile("^/$")
+		return nil
 	}
 
 	route.Params = make(map[string]bool, 0)
@@ -61,14 +68,14 @@ func parse(pattern string, route *Route) error {
 	}
 
 	routePattern += "/?$"
-	if pathReg, err := regexp.Compile(routePattern); err == nil {
+	pathReg, err := regexp.Compile(routePattern)
+	if err == nil {
 		route.PathReg = pathReg
-		return nil
-	} else {
-		return err
 	}
+	return err
 }
 
+// Equals checks whether two routes are equaled
 func (route *Route) Equals(other *Route) bool {
 	if route.PathReg.String() != other.PathReg.String() {
 		return false

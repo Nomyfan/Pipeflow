@@ -2,7 +2,8 @@ package pipeflow
 
 import "net/http"
 
-type HttpContext struct {
+// HTTPContext is the request context wrapper
+type HTTPContext struct {
 	Request        *http.Request
 	ResponseWriter http.ResponseWriter
 	Vars           *map[string]string

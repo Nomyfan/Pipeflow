@@ -5,15 +5,16 @@ import (
 )
 import "net/http"
 
+// Flow is main service register center
 type Flow struct {
 	cors       RunnableMiddleware
-	handlers   []HttpHandler
+	handlers   []RequestHandler
 	middleware []Middleware
-	dispatcher *HttpHandlerDispatcher
+	dispatcher *HTTPRequestDispatcher
 }
 
 func (flow Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
-	ctx := HttpContext{Request: res, ResponseWriter: writer}
+	ctx := HTTPContext{Request: res, ResponseWriter: writer}
 	toBreak := false
 
 	for _, v := range flow.middleware {
@@ -32,15 +33,17 @@ func (flow Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
 	}
 }
 
+// NewFlow returns a new instance of pipeflow
 func NewFlow() Flow {
 	flow := Flow{}
-	flow.handlers = []HttpHandler{}
+	flow.handlers = []RequestHandler{}
 	flow.middleware = []Middleware{}
-	flow.dispatcher = &HttpHandlerDispatcher{Handlers: &flow.handlers}
+	flow.dispatcher = &HTTPRequestDispatcher{Handlers: &flow.handlers}
 
 	return flow
 }
 
+// Use registers middleware
 func (flow *Flow) Use(middleware Middleware) {
 	// Register middleware
 	if nil != middleware {
@@ -49,10 +52,10 @@ func (flow *Flow) Use(middleware Middleware) {
 }
 
 type runnableMiddleware struct {
-	Handler func(ctx HttpContext)
+	Handler func(ctx HTTPContext)
 }
 
-func (rm *runnableMiddleware) Handle(ctx HttpContext) bool {
+func (rm *runnableMiddleware) Handle(ctx HTTPContext) bool {
 	rm.Handler(ctx)
 	return true
 }
@@ -64,6 +67,7 @@ func (flow *Flow) Run(middleware RunnableMiddleware) {
 	}
 }
 
+// UseCors registers CORS middleware
 func (flow *Flow) UseCors(origins []string, methods []string, headers []string, expose []string) {
 	cors := Cors{AllowedOrigins: map[string]bool{}, AllowedMethods: methods, AllowedHeaders: headers, ExposedHeaders: expose}
 	if nil != origins {
@@ -74,7 +78,8 @@ func (flow *Flow) UseCors(origins []string, methods []string, headers []string, 
 	flow.cors = &cors
 }
 
-func (flow *Flow) Register(path string, handler Handler, methods []HttpMethod) error {
+// Register is used to add request handler
+func (flow *Flow) Register(path string, handler func(ctx HTTPContext), methods []HTTPMethod) error {
 	path = strings.Trim(path, " ")
 	if "" == path || path[0] != '/' || nil == methods || len(methods) == 0 || nil == handler {
 		return BasicError{Message: "Args given are not valid"}
@@ -85,7 +90,7 @@ func (flow *Flow) Register(path string, handler Handler, methods []HttpMethod) e
 		return err
 	}
 
-	httpHandler := HttpHandler{Route: &route, Handle: handler, Methods: map[HttpMethod]bool{}}
+	httpHandler := RequestHandler{Route: &route, Handle: handler, Methods: map[HTTPMethod]bool{}}
 	for _, v := range methods {
 		httpHandler.Methods[v] = true
 	}
@@ -98,7 +103,7 @@ func (flow *Flow) Register(path string, handler Handler, methods []HttpMethod) e
 	return nil
 }
 
-func (flow *Flow) checkConflict(handler *HttpHandler) bool {
+func (flow *Flow) checkConflict(handler *RequestHandler) bool {
 	for _, h := range flow.handlers {
 		if h.Conflict(handler) {
 			return true
@@ -108,7 +113,7 @@ func (flow *Flow) checkConflict(handler *HttpHandler) bool {
 	return false
 }
 
-func (flow *Flow) appendHandler(handler HttpHandler) {
+func (flow *Flow) appendHandler(handler RequestHandler) {
 	flow.handlers = append(flow.handlers, handler)
 	flow.dispatcher.Handlers = &flow.handlers
 }

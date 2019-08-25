@@ -4,6 +4,7 @@ import (
 	"strings"
 )
 
+// Cors is used to handle CORS
 type Cors struct {
 	AllowedOrigins map[string]bool
 	AllowedMethods []string
@@ -11,7 +12,8 @@ type Cors struct {
 	ExposedHeaders []string
 }
 
-func (cors *Cors) Handle(ctx HttpContext) {
+// Handle implements middleware
+func (cors *Cors) Handle(ctx HTTPContext) {
 	// Cors runs after any middleware and before dispatcher middleware
 	origin := ctx.Request.Header.Get("Origin")
 	enabled := false

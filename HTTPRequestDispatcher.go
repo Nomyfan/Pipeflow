@@ -4,12 +4,13 @@ import (
 	"fmt"
 )
 
-// HttpHandlerDispatcher is a middleware in the end point of workflow
-type HttpHandlerDispatcher struct {
-	Handlers *[]HttpHandler
+// HTTPRequestDispatcher is a middleware in the end point of workflow
+type HTTPRequestDispatcher struct {
+	Handlers *[]RequestHandler
 }
 
-func (hd *HttpHandlerDispatcher) Handle(ctx HttpContext) bool {
+// Handle implements middleware
+func (hd *HTTPRequestDispatcher) Handle(ctx HTTPContext) bool {
 	for _, v := range *hd.Handlers {
 		if v.Match(ctx.Request) {
 			getPathVars(&v, &ctx)
@@ -23,7 +24,7 @@ func (hd *HttpHandlerDispatcher) Handle(ctx HttpContext) bool {
 	return false
 }
 
-func getPathVars(handler *HttpHandler, ctx *HttpContext) {
+func getPathVars(handler *RequestHandler, ctx *HTTPContext) {
 	regex := handler.Route.PathReg
 
 	vars := regex.FindAllStringSubmatch(ctx.Request.URL.Path, -1)
