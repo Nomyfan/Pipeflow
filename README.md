@@ -1,52 +1,59 @@
 # Pipeflow
-Pipeflow is a middleware container which is planned to used in my own blog system.
+Pipeflow is a middleware container which is used in my own blog system.
 
-## Quick Start
+## Quick Look
 ```golang
-import (
-	"fmt"
-	. "github.com/Nomyfan/pipeflow"
-	"net/http"
-)
-
 func main() {
-	flow := NewFlow()
+	flow := pipeflow.NewFlow()
+
+	flow.Run(func(ctx pipeflow.HTTPContext) {
+		fmt.Println("request URL: " + ctx.Request.RequestURI)
+	})
+
 	flow.UseCors([]string{"http://localhost:18080"}, nil, nil, nil)
-	_ = flow.Register("/api/index/greet", apiGreet, []HttpMethod{HttpGet})
-	_ = flow.Register("/hello/{foo}/{bar}/tail?uid=?&name=?", helloHandler, []HttpMethod{HttpGet, HttpPost})
-	flow.Run(loggerMiddleware{})
-	flow.Use(tokenChecker{})
-	_ = http.ListenAndServe(":12080", flow)
+
+	flow.Use(func(ctx pipeflow.HTTPContext, next func()) {
+		fmt.Println("first")
+		next()
+		fmt.Println("first post action")
+	})
+
+	flow.Use(func(ctx pipeflow.HTTPContext, next func()) {
+		fmt.Println("second")
+		next()
+		fmt.Println("second post action")
+	})
+
+	flow.Use(func(ctx pipeflow.HTTPContext, next func()) {
+		if token := ctx.Request.Header.Get("token"); token != "" {
+			next()
+		} else {
+			ctx.ResponseWriter.WriteHeader(http.StatusNonAuthoritativeInfo)
+			_, _ = ctx.ResponseWriter.Write([]byte("NonAuthoritativeInfo"))
+		}
+	})
+
+	_ = flow.Register("/hello", func(ctx pipeflow.HTTPContext) {
+		_, _ = ctx.ResponseWriter.Write([]byte("hello"))
+	}, []pipeflow.HTTPMethod{pipeflow.HTTPGet})
+
+	_ = flow.Register("/{foo}/hello?id=?&name=?", func(ctx pipeflow.HTTPContext) {
+		_, _ = fmt.Fprintln(ctx.ResponseWriter, "foo = "+(*ctx.Vars)["foo"]+", id = "+ctx.Request.Form.Get("id")+", name = "+ctx.Request.Form.Get("name"))
+	}, []pipeflow.HTTPMethod{pipeflow.HTTPPost})
+
+	_ = http.ListenAndServe(":8888", flow)
 }
+```
 
-func apiGreet(ctx HttpContext) {
-	fmt.Println(ctx.Request.Host)
-	_, _ = fmt.Fprintln(ctx.ResponseWriter, "1")
-}
+Request: `http://localhost:8888/bar/hello?id=1&name=nomyfan`
 
-func helloHandler(ctx HttpContext) {
-	_, _ = fmt.Fprintln(ctx.ResponseWriter, "<h1>Pipeflow</h1></br> Foo: "+(*ctx.Vars)["foo"]+"</br> Bar: "+(*ctx.Vars)["bar"])
-}
+Response: `foo = bar, id = 1, name = nomyfan`
 
-type loggerMiddleware struct {
-}
-
-func (lmw loggerMiddleware) Handle(ctx HttpContext) {
-	fmt.Println("Request from " + ctx.Request.Header.Get("Origin"))
-	fmt.Println("The path is " + ctx.Request.URL.Path)
-	fmt.Println("Http method is " + ctx.Request.Method)
-}
-
-type tokenChecker struct {
-}
-
-func (tc tokenChecker) Handle(ctx HttpContext) bool {
-	if "" != ctx.Request.Header.Get("token") {
-		return true
-	}
-
-	fmt.Println("Cannot access")
-	return false
-}
-
+Console output:
+```
+request URL: /bar/hello?id=1&name=nomyfan
+first
+second
+second post action
+first post action
 ```

@@ -7,63 +7,66 @@ import "net/http"
 
 // Flow is main service register center
 type Flow struct {
-	cors       RunnableMiddleware
+	cors       func(ctx HTTPContext)
 	handlers   []RequestHandler
-	middleware []Middleware
+	middleware []func(ctx HTTPContext, next func())
 	dispatcher *HTTPRequestDispatcher
 }
 
 func (flow Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
 	ctx := HTTPContext{Request: res, ResponseWriter: writer}
-	toBreak := false
 
-	for _, v := range flow.middleware {
-		if !v.Handle(ctx) {
-			toBreak = true
-			break
-		}
+	// Add CORS to the pipeline
+	if flow.cors != nil {
+		flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
+			flow.cors(ctx)
+			next()
+		})
 	}
 
-	if nil != flow.cors {
-		flow.cors.Handle(ctx)
+	// Add dispatcher to the end of pipeline
+	if flow.dispatcher != nil {
+		flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
+			flow.dispatcher.Handle(ctx)
+		})
 	}
 
-	if !toBreak {
-		flow.dispatcher.Handle(ctx)
+	invoke(&flow, ctx, 0)
+}
+
+func invoke(f *Flow, ctx HTTPContext, i int) {
+	if i == len(f.middleware) {
+		return
 	}
+	f.middleware[i](ctx, func() {
+		invoke(f, ctx, i+1)
+	})
 }
 
 // NewFlow returns a new instance of pipeflow
 func NewFlow() Flow {
 	flow := Flow{}
 	flow.handlers = []RequestHandler{}
-	flow.middleware = []Middleware{}
+	flow.middleware = []func(ctx HTTPContext, next func()){}
 	flow.dispatcher = &HTTPRequestDispatcher{Handlers: &flow.handlers}
 
 	return flow
 }
 
 // Use registers middleware
-func (flow *Flow) Use(middleware Middleware) {
-	// Register middleware
-	if nil != middleware {
+func (flow *Flow) Use(middleware func(ctx HTTPContext, next func())) {
+	if middleware != nil {
 		flow.middleware = append(flow.middleware, middleware)
 	}
 }
 
-type runnableMiddleware struct {
-	Handler func(ctx HTTPContext)
-}
-
-func (rm *runnableMiddleware) Handle(ctx HTTPContext) bool {
-	rm.Handler(ctx)
-	return true
-}
-
-// Run | Runnable middleware always returns true
-func (flow *Flow) Run(middleware RunnableMiddleware) {
+// Run runnable typed middleware will always invoke next
+func (flow *Flow) Run(middleware func(ctx HTTPContext)) {
 	if nil != middleware {
-		flow.Use(&runnableMiddleware{Handler: middleware.Handle})
+		flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
+			middleware(ctx)
+			next()
+		})
 	}
 }
 
@@ -75,7 +78,9 @@ func (flow *Flow) UseCors(origins []string, methods []string, headers []string, 
 			cors.AllowedOrigins[v] = true
 		}
 	}
-	flow.cors = &cors
+	flow.cors = func(ctx HTTPContext) {
+		cors.Handle(ctx)
+	}
 }
 
 // Register is used to add request handler
