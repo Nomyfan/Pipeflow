@@ -54,7 +54,7 @@ func (h *RequestHandler) HasInterMethod(other *RequestHandler) bool {
 	return false
 }
 
-// Match check there is any request handler.
+// Match check if there is any request handler.
 func (h *RequestHandler) Match(request *http.Request) bool {
 	path := request.URL.Path
 	method := request.Method
