@@ -51,7 +51,7 @@ func parse(pattern string, route *Route) error {
 		} else if pathReg.MatchString(v) {
 			routePattern += "/" + v
 		} else if varReg.MatchString(v) {
-			routePattern += `/(?P<` + v[1:len(v)-1] + `>[\x{4e00}-\x{9fa5}\w]+)`
+			routePattern += `/(?P<` + v[1:len(v)-1] + `>[\x{4e00}-\x{9fa5}\w.]+)`
 			route.Vars[v[1:len(v)-1]] = true
 		} else if paramReg.MatchString(v) {
 			if i != len(parts)-1 {
