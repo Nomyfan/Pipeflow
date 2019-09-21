@@ -33,12 +33,22 @@ func main() {
 		}
 	})
 
+	redisClient := redis.NewClient(&redis.Options{Addr: "xxx.xxx.xxx.xxx:6379", Password: "password", DB: 0})
+	if _, err := redisClient.Ping().Result(); nil != err {
+		panic(err)
+	}
+
+	flow.SetResource("redis", redisClient)
+
 	_ = flow.Register("/hello", func(ctx pipeflow.HTTPContext) {
+		var client, _ = ctx.GetResource("redis").(*redis.Client)
+		var count, _ = client.Get("count").Int()
+		client.Set("count", count+1, -1)
 		_, _ = ctx.ResponseWriter.Write([]byte("hello"))
 	}, []pipeflow.HTTPMethod{pipeflow.HTTPGet})
 
 	_ = flow.Register("/{foo}/hello?id=?&name=?", func(ctx pipeflow.HTTPContext) {
-		_, _ = fmt.Fprintln(ctx.ResponseWriter, "foo = "+(*ctx.Vars)["foo"]+", id = "+ctx.Request.Form.Get("id")+", name = "+ctx.Request.Form.Get("name"))
+		_, _ = fmt.Fprintln(ctx.ResponseWriter, "foo = "+ctx.Vars["foo"]+", id = "+ctx.Request.Form.Get("id")+", name = "+ctx.Request.Form.Get("name"))
 	}, []pipeflow.HTTPMethod{pipeflow.HTTPPost})
 
 	_ = http.ListenAndServe(":8888", flow)

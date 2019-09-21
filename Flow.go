@@ -11,10 +11,11 @@ type Flow struct {
 	handlers   []RequestHandler
 	middleware []func(ctx HTTPContext, next func())
 	dispatcher *HTTPRequestDispatcher
+	resource   map[string]interface{}
 }
 
 func (flow Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
-	ctx := HTTPContext{Request: res, ResponseWriter: writer}
+	ctx := HTTPContext{Request: res, ResponseWriter: writer, resource: flow.resource}
 
 	// Add CORS to the pipeline
 	if flow.cors != nil {
@@ -49,6 +50,7 @@ func NewFlow() Flow {
 	flow.handlers = []RequestHandler{}
 	flow.middleware = []func(ctx HTTPContext, next func()){}
 	flow.dispatcher = &HTTPRequestDispatcher{Handlers: &flow.handlers}
+	flow.resource = map[string]interface{}{}
 
 	return flow
 }
@@ -106,6 +108,11 @@ func (flow *Flow) Register(path string, handler func(ctx HTTPContext), methods [
 
 	flow.appendHandler(httpHandler)
 	return nil
+}
+
+// SetResource set global singleton resource
+func (flow Flow) SetResource(key string, value interface{}) {
+	flow.resource[key] = value
 }
 
 func (flow *Flow) checkConflict(handler *RequestHandler) bool {

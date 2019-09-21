@@ -6,5 +6,11 @@ import "net/http"
 type HTTPContext struct {
 	Request        *http.Request
 	ResponseWriter http.ResponseWriter
-	Vars           *map[string]string
+	Vars           map[string]string
+	resource       map[string]interface{}
+}
+
+// GetResource get global singleton resource preset
+func (ctx HTTPContext) GetResource(key string) interface{} {
+	return ctx.resource[key]
 }

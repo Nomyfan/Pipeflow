@@ -30,11 +30,11 @@ func getPathVars(handler *RequestHandler, ctx *HTTPContext) {
 
 	vars := regex.FindAllStringSubmatch(ctx.Request.URL.Path, -1)
 	groupNames := regex.SubexpNames()
-	ctx.Vars = &map[string]string{}
+	ctx.Vars = map[string]string{}
 
 	for i, name := range groupNames {
 		if _, ok := handler.Route.Vars[name]; ok && name != "" {
-			(*ctx.Vars)[name] = vars[0][i]
+			ctx.Vars[name] = vars[0][i]
 		}
 	}
 }
