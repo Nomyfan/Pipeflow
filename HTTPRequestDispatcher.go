@@ -12,17 +12,25 @@ type HTTPRequestDispatcher struct {
 
 // Handle implements middleware
 func (hd *HTTPRequestDispatcher) Handle(ctx HTTPContext) {
+	matchMsg := ""
 	for _, v := range *hd.Handlers {
-		if v.Match(ctx.Request) {
-			getPathVars(&v, &ctx)
-			v.Handle(ctx)
-			return
+		if v.MatchPath(ctx.Request) {
+			if v.MatchMethod(ctx.Request) {
+				getPathVars(&v, &ctx)
+				v.Handle(ctx)
+				return
+			} else {
+				matchMsg = "Request method doesn't match"
+			}
+			break
+		} else {
+			matchMsg = "Path doesn't match"
 		}
 	}
 
 	ctx.ResponseWriter.Header().Set("Content-Type", "text/html; charset=utf-8")
 	ctx.ResponseWriter.WriteHeader(http.StatusNotFound)
-	_, _ = fmt.Fprint(ctx.ResponseWriter, "<h1>404</h1> <h3>Cannot found the request path <span style='color: red;'>"+ctx.Request.RequestURI)
+	_, _ = fmt.Fprint(ctx.ResponseWriter, "<h1 style='color: #171717;'>404 Not Found</h1> <h3 style='color: #171717;'>Cannot handle the request path <span style='color: #d82b21;'>"+ctx.Request.RequestURI+"</span></h3><p>Message: "+matchMsg+"</p>")
 }
 
 func getPathVars(handler *RequestHandler, ctx *HTTPContext) {
