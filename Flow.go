@@ -85,8 +85,8 @@ func (flow *Flow) UseCors(origins []string, methods []string, headers []string, 
 	}
 }
 
-// Register is used to add request handler
-func (flow *Flow) Register(path string, handler func(ctx HTTPContext), methods []HTTPMethod) error {
+// Map is used to add request handler
+func (flow *Flow) Map(path string, handler func(ctx HTTPContext), methods []HTTPMethod) error {
 	path = strings.Trim(path, " ")
 	if "" == path || path[0] != '/' || nil == methods || len(methods) == 0 || nil == handler {
 		return BasicError{Message: "Args given are not valid"}
@@ -108,6 +108,14 @@ func (flow *Flow) Register(path string, handler func(ctx HTTPContext), methods [
 
 	flow.appendHandler(httpHandler)
 	return nil
+}
+
+func (flow *Flow) GET(path string, handler func(ctx HTTPContext)) error {
+	return flow.Map(path, handler, []HTTPMethod{HTTPGet})
+}
+
+func (flow *Flow) POST(path string, handler func(ctx HTTPContext)) error {
+	return flow.Map(path, handler, []HTTPMethod{HTTPPost})
 }
 
 // SetResource set global singleton resource
