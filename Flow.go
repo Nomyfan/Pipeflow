@@ -1,6 +1,7 @@
 package pipeflow
 
 import (
+	"errors"
 	"strings"
 )
 import "net/http"
@@ -94,7 +95,7 @@ func (flow *Flow) UseCors(origins []string, methods []string, headers []string, 
 func (flow *Flow) Map(path string, handler func(ctx HTTPContext), methods []HTTPMethod) error {
 	path = strings.Trim(path, " ")
 	if "" == path || path[0] != '/' || nil == methods || len(methods) == 0 || nil == handler {
-		return BasicError{Message: "Args given are not valid"}
+		return errors.New("args given are not valid")
 	}
 
 	route, err := BuildRoute(path)
@@ -108,7 +109,7 @@ func (flow *Flow) Map(path string, handler func(ctx HTTPContext), methods []HTTP
 	}
 
 	if flow.checkConflict(&httpHandler) {
-		return BasicError{Message: "This handler conflicts with existing one"}
+		return errors.New("this handler conflicts with the existing one")
 	}
 
 	flow.appendHandler(httpHandler)

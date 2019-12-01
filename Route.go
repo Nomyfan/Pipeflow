@@ -1,6 +1,7 @@
 package pipeflow
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 )
@@ -22,7 +23,7 @@ func BuildRoute(pattern string) (Route, error) {
 
 func parse(pattern string, route *Route) error {
 	if len(pattern) == 0 {
-		return BasicError{Message: "Path should not be empty"}
+		return errors.New("path should not be empty")
 	}
 
 	if "/" == pattern {
@@ -47,7 +48,7 @@ func parse(pattern string, route *Route) error {
 	}
 	for i, v := range parts {
 		if len(v) == 0 {
-			return BasicError{Message: "Partial path cannot be empty"}
+			return errors.New("partial path cannot be empty")
 		} else if pathReg.MatchString(v) {
 			routePattern += "/" + v
 		} else if varReg.MatchString(v) {
@@ -55,7 +56,7 @@ func parse(pattern string, route *Route) error {
 			route.Vars[v[1:len(v)-1]] = true
 		} else if paramReg.MatchString(v) {
 			if i != len(parts)-1 {
-				return BasicError{Message: "Params should be in the last"}
+				return errors.New("params should be in the last")
 			}
 			routePattern += `/` + paramReg.FindStringSubmatch(v)[1]
 			// Add params into map
@@ -63,7 +64,7 @@ func parse(pattern string, route *Route) error {
 				route.Params[m[1]] = true
 			}
 		} else {
-			return BasicError{Message: "Invalid URL was give"}
+			return errors.New("invalid URL was give")
 		}
 	}
 
