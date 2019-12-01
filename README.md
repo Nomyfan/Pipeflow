@@ -45,7 +45,7 @@ func main() {
 		var count, _ = client.Get("count").Int()
 		client.Set("count", count+1, -1)
 		_, _ = ctx.ResponseWriter.Write([]byte("hello"))
-	}, []pipeflow.HTTPMethod{pipeflow.HTTPPost})
+	}, []pipeflow.HTTPMethod{pipeflow.HTTPPost, pipeflow.HTTPGet})
 
 	_ = flow.GET("/hello", func(ctx pipeflow.HTTPContext) {
 		var client, _ = ctx.GetResource("redis").(*redis.Client)

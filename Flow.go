@@ -8,6 +8,7 @@ import "net/http"
 // Flow is main service register center
 type Flow struct {
 	cors       func(ctx HTTPContext)
+	notfound   func(ctx HTTPContext)
 	handlers   []RequestHandler
 	middleware []func(ctx HTTPContext, next func())
 	dispatcher *HTTPRequestDispatcher
@@ -15,7 +16,7 @@ type Flow struct {
 }
 
 func (flow Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
-	ctx := HTTPContext{Request: res, ResponseWriter: writer, resource: flow.resource}
+	ctx := HTTPContext{Request: res, ResponseWriter: writer, resource: flow.resource, Props: map[string]interface{}{}}
 
 	// Add CORS to the pipeline
 	if flow.cors != nil {
@@ -25,10 +26,13 @@ func (flow Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
 		})
 	}
 
-	// Add dispatcher to the end of pipeline
+	// Add HTTP dispatcher
 	if flow.dispatcher != nil {
 		flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
-			flow.dispatcher.Handle(ctx)
+			if err := flow.dispatcher.Handle(ctx); err != nil && flow.notfound != nil {
+				ctx.Props["crash_reason"] = err.Error()
+				flow.notfound(ctx)
+			}
 		})
 	}
 
@@ -51,6 +55,7 @@ func NewFlow() Flow {
 	flow.middleware = []func(ctx HTTPContext, next func()){}
 	flow.dispatcher = &HTTPRequestDispatcher{Handlers: &flow.handlers}
 	flow.resource = map[string]interface{}{}
+	flow.notfound = NotFoundMiddleware
 
 	return flow
 }

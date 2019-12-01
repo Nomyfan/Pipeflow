@@ -8,6 +8,7 @@ type HTTPContext struct {
 	ResponseWriter http.ResponseWriter
 	Vars           map[string]string
 	resource       map[string]interface{}
+	Props          map[string]interface{}
 }
 
 // GetResource get global singleton resource preset
