@@ -95,15 +95,15 @@ func (flow *Flow) UseCors(origins []string, methods []string, headers []string, 
 }
 
 // Map is used to add request handler
-func (flow *Flow) Map(path string, handler func(ctx HTTPContext), methods []HTTPMethod) error {
+func (flow *Flow) Map(path string, handler func(ctx HTTPContext), methods []HTTPMethod) {
 	path = strings.Trim(path, " ")
 	if "" == path || path[0] != '/' || nil == methods || len(methods) == 0 || nil == handler {
-		return errors.New("args given are not valid")
+		panic(errors.New("args given are not valid"))
 	}
 
 	route, err := BuildRoute(path)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	httpHandler := RequestHandler{Route: &route, Handle: handler, Methods: map[HTTPMethod]bool{}}
@@ -112,19 +112,18 @@ func (flow *Flow) Map(path string, handler func(ctx HTTPContext), methods []HTTP
 	}
 
 	if flow.checkConflict(&httpHandler) {
-		return errors.New("this handler conflicts with the existing one")
+		panic(errors.New("this handler conflicts with the existing one"))
 	}
 
 	flow.appendHandler(httpHandler)
-	return nil
 }
 
-func (flow *Flow) GET(path string, handler func(ctx HTTPContext)) error {
-	return flow.Map(path, handler, []HTTPMethod{HTTPGet})
+func (flow *Flow) GET(path string, handler func(ctx HTTPContext)) {
+	flow.Map(path, handler, []HTTPMethod{HTTPGet})
 }
 
-func (flow *Flow) POST(path string, handler func(ctx HTTPContext)) error {
-	return flow.Map(path, handler, []HTTPMethod{HTTPPost})
+func (flow *Flow) POST(path string, handler func(ctx HTTPContext)) {
+	flow.Map(path, handler, []HTTPMethod{HTTPPost})
 }
 
 // SetResource sets global singleton resource

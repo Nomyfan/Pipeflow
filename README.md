@@ -2,7 +2,17 @@
 Pipeflow is a middleware container which is used in my own blog system.
 
 ## Quick Look
-```golang
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/go-redis/redis"
+    "net/http"
+    "pipeflow"
+    "reflect"
+)
+
 func main() {
 	flow := pipeflow.NewFlow()
 
@@ -42,14 +52,14 @@ func main() {
 	// flow.SetResourceWithType(reflect.TypeOf(redisClient), redisClient)
 	flow.SetResourceAlsoWithType("redis", redisClient)
 
-	_ = flow.Map("/hey", func(ctx pipeflow.HTTPContext) {
+	flow.Map("/hey", func(ctx pipeflow.HTTPContext) {
 		var client, _ = ctx.GetResource("redis").(*redis.Client)
 		var count, _ = client.Get("count").Int()
 		client.Set("count", count+1, -1)
 		_, _ = ctx.ResponseWriter.Write([]byte("hello"))
 	}, []pipeflow.HTTPMethod{pipeflow.HTTPPost, pipeflow.HTTPGet})
 
-	_ = flow.GET("/hello", func(ctx pipeflow.HTTPContext) {
+	flow.GET("/hello", func(ctx pipeflow.HTTPContext) {
 		var client1, _ = ctx.GetResource("redis").(*redis.Client)
 		var client2 = ctx.GetResourceByType(reflect.TypeOf((*redis.Client)(nil))).(*redis.Client)
 		var count, _ = client1.Get("count").Int()
@@ -57,7 +67,7 @@ func main() {
 		_, _ = ctx.ResponseWriter.Write([]byte("hello"))
 	})
 
-	_ = flow.POST("/{foo}/hello?id=?&name=?", func(ctx pipeflow.HTTPContext) {
+	flow.POST("/{foo}/hello?id=?&name=?", func(ctx pipeflow.HTTPContext) {
 		_, _ = fmt.Fprintln(ctx.ResponseWriter, "foo = "+ctx.Vars["foo"]+", id = "+ctx.Request.Form.Get("id")+", name = "+ctx.Request.Form.Get("name"))
 	})
 
