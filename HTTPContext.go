@@ -1,6 +1,9 @@
 package pipeflow
 
-import "net/http"
+import (
+	"net/http"
+	"reflect"
+)
 
 // HTTPContext is the request context wrapper
 type HTTPContext struct {
@@ -8,10 +11,16 @@ type HTTPContext struct {
 	ResponseWriter http.ResponseWriter
 	Vars           map[string]string
 	resource       map[string]interface{}
+	resourceType   map[reflect.Type]interface{}
 	Props          map[string]interface{}
 }
 
-// GetResource get global singleton resource preset
+// GetResource gets global singleton resource preset
 func (ctx HTTPContext) GetResource(key string) interface{} {
 	return ctx.resource[key]
+}
+
+// GetResourceByType gets global singleton resource preset by type
+func (ctx HTTPContext) GetResourceByType(key reflect.Type) interface{} {
+	return ctx.resourceType[key]
 }

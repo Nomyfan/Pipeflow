@@ -38,7 +38,9 @@ func main() {
 		panic(err)
 	}
 
-	flow.SetResource("redis", redisClient)
+	// flow.SetResource("redis", redisClient)
+	// flow.SetResourceWithType(reflect.TypeOf(redisClient), redisClient)
+	flow.SetResourceAlsoWithType("redis", redisClient)
 
 	_ = flow.Map("/hey", func(ctx pipeflow.HTTPContext) {
 		var client, _ = ctx.GetResource("redis").(*redis.Client)
@@ -48,9 +50,10 @@ func main() {
 	}, []pipeflow.HTTPMethod{pipeflow.HTTPPost, pipeflow.HTTPGet})
 
 	_ = flow.GET("/hello", func(ctx pipeflow.HTTPContext) {
-		var client, _ = ctx.GetResource("redis").(*redis.Client)
-		var count, _ = client.Get("count").Int()
-		client.Set("count", count+1, -1)
+		var client1, _ = ctx.GetResource("redis").(*redis.Client)
+		var client2 = ctx.GetResourceByType(reflect.TypeOf((*redis.Client)(nil))).(*redis.Client)
+		var count, _ = client1.Get("count").Int()
+		client2.Set("count", count+1, -1)
 		_, _ = ctx.ResponseWriter.Write([]byte("hello"))
 	})
 

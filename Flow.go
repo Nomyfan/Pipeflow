@@ -2,22 +2,24 @@ package pipeflow
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 )
 import "net/http"
 
 // Flow is main service register center
 type Flow struct {
-	cors       func(ctx HTTPContext)
-	notfound   func(ctx HTTPContext)
-	handlers   []RequestHandler
-	middleware []func(ctx HTTPContext, next func())
-	dispatcher *HTTPRequestDispatcher
-	resource   map[string]interface{}
+	cors         func(ctx HTTPContext)
+	notfound     func(ctx HTTPContext)
+	handlers     []RequestHandler
+	middleware   []func(ctx HTTPContext, next func())
+	dispatcher   *HTTPRequestDispatcher
+	resource     map[string]interface{}
+	resourceType map[reflect.Type]interface{}
 }
 
 func (flow Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
-	ctx := HTTPContext{Request: res, ResponseWriter: writer, resource: flow.resource, Props: map[string]interface{}{}}
+	ctx := HTTPContext{Request: res, ResponseWriter: writer, resource: flow.resource, resourceType: flow.resourceType, Props: map[string]interface{}{}}
 
 	// Add CORS to the pipeline
 	if flow.cors != nil {
@@ -56,6 +58,7 @@ func NewFlow() Flow {
 	flow.middleware = []func(ctx HTTPContext, next func()){}
 	flow.dispatcher = &HTTPRequestDispatcher{Handlers: &flow.handlers}
 	flow.resource = map[string]interface{}{}
+	flow.resourceType = map[reflect.Type]interface{}{}
 	flow.notfound = NotFoundMiddleware
 
 	return flow
@@ -124,9 +127,20 @@ func (flow *Flow) POST(path string, handler func(ctx HTTPContext)) error {
 	return flow.Map(path, handler, []HTTPMethod{HTTPPost})
 }
 
-// SetResource set global singleton resource
+// SetResource sets global singleton resource
 func (flow Flow) SetResource(key string, value interface{}) {
 	flow.resource[key] = value
+}
+
+// SetResourceWithType sets global singleton resource using it's type as key
+func (flow Flow) SetResourceWithType(key reflect.Type, value interface{}) {
+	flow.resourceType[key] = value
+}
+
+// SetResourceAlsoWithType calls SetResource and SetResourceWithType
+func (flow Flow) SetResourceAlsoWithType(key string, value interface{}) {
+	flow.SetResource(key, value)
+	flow.SetResourceWithType(reflect.TypeOf(value), value)
 }
 
 func (flow *Flow) checkConflict(handler *RequestHandler) bool {
