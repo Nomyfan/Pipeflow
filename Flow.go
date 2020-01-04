@@ -18,7 +18,7 @@ type Flow struct {
 	resourceType map[reflect.Type]interface{}
 }
 
-func (flow Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
+func (flow *Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
 	ctx := HTTPContext{Request: res, ResponseWriter: writer, resource: flow.resource, resourceType: flow.resourceType, Props: map[string]interface{}{}}
 
 	// Add CORS to the pipeline
@@ -39,7 +39,7 @@ func (flow Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
 		})
 	}
 
-	invoke(&flow, ctx, 0)
+	invoke(flow, ctx, 0)
 }
 
 func invoke(f *Flow, ctx HTTPContext, i int) {
@@ -52,7 +52,7 @@ func invoke(f *Flow, ctx HTTPContext, i int) {
 }
 
 // NewFlow returns a new instance of pipeflow
-func NewFlow() Flow {
+func NewFlow() *Flow {
 	flow := Flow{}
 	flow.handlers = []RequestHandler{}
 	flow.middleware = []func(ctx HTTPContext, next func()){}
@@ -61,7 +61,7 @@ func NewFlow() Flow {
 	flow.resourceType = map[reflect.Type]interface{}{}
 	flow.notfound = NotFoundMiddleware
 
-	return flow
+	return &flow
 }
 
 // Use registers middleware
@@ -127,17 +127,17 @@ func (flow *Flow) POST(path string, handler func(ctx HTTPContext)) {
 }
 
 // SetResource sets global singleton resource
-func (flow Flow) SetResource(key string, value interface{}) {
+func (flow *Flow) SetResource(key string, value interface{}) {
 	flow.resource[key] = value
 }
 
 // SetResourceWithType sets global singleton resource using it's type as key
-func (flow Flow) SetResourceWithType(key reflect.Type, value interface{}) {
+func (flow *Flow) SetResourceWithType(key reflect.Type, value interface{}) {
 	flow.resourceType[key] = value
 }
 
 // SetResourceAlsoWithType calls SetResource and SetResourceWithType
-func (flow Flow) SetResourceAlsoWithType(key string, value interface{}) {
+func (flow *Flow) SetResourceAlsoWithType(key string, value interface{}) {
 	flow.SetResource(key, value)
 	flow.SetResourceWithType(reflect.TypeOf(value), value)
 }
