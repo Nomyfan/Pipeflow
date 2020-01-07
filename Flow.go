@@ -142,6 +142,16 @@ func (flow *Flow) SetResourceAlsoWithType(key string, value interface{}) {
 	flow.SetResourceWithType(reflect.TypeOf(value), value)
 }
 
+// GetResource gets global singleton resource preset
+func (flow *Flow) GetResource(key string) interface{} {
+	return flow.resource[key]
+}
+
+// GetResourceByType gets global singleton resource preset by type
+func (flow *Flow) GetResourceByType(key reflect.Type) interface{} {
+	return flow.resourceType[key]
+}
+
 func (flow *Flow) checkConflict(handler *RequestHandler) bool {
 	for _, h := range flow.handlers {
 		if h.Conflict(handler) {
