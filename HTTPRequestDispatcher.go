@@ -1,31 +1,83 @@
 package pipeflow
 
-import "errors"
+import (
+	"github.com/pkg/errors"
+	"strings"
+)
 
-// HTTPRequestDispatcher is a middleware in the end point of workflow
-type HTTPRequestDispatcher struct {
-	Handlers *[]RequestHandler
+type HTTPRequestDispatcher interface {
+	Map(path string, handler func(ctx HTTPContext), methods []HTTPMethod)
+	GET(path string, handler func(ctx HTTPContext))
+	POST(path string, handler func(ctx HTTPContext))
+	Handle(ctx HTTPContext)
 }
 
-// Handle implements middleware
-func (hd *HTTPRequestDispatcher) Handle(ctx HTTPContext) error {
-	methodNotMatch := false
-	for _, v := range *hd.Handlers {
+type DefaultHTTPRequestDispatcher struct {
+	handlers []RequestHandler
+}
+
+func NewDefaultRequestDispatcher() *DefaultHTTPRequestDispatcher {
+	return &DefaultHTTPRequestDispatcher{handlers: []RequestHandler{}}
+}
+
+func (m *DefaultHTTPRequestDispatcher) Map(path string, handler func(ctx HTTPContext), methods []HTTPMethod) {
+	path = strings.Trim(path, " ")
+	if "" == path || path[0] != '/' || nil == methods || len(methods) == 0 || nil == handler {
+		panic(errors.New("args given are not valid"))
+	}
+
+	route, err := BuildRoute(path)
+	if err != nil {
+		panic(err)
+	}
+
+	httpHandler := RequestHandler{Route: &route, Handle: handler, Methods: map[HTTPMethod]bool{}}
+	for _, v := range methods {
+		httpHandler.Methods[v] = true
+	}
+
+	if checkConflict(m.handlers, &httpHandler) {
+		panic(errors.New("this handler conflicts with the existing one"))
+	}
+
+	appendHandler(m, httpHandler)
+}
+
+func (m *DefaultHTTPRequestDispatcher) GET(path string, handler func(ctx HTTPContext)) {
+	m.Map(path, handler, []HTTPMethod{HTTPGet})
+}
+
+func (m *DefaultHTTPRequestDispatcher) POST(path string, handler func(ctx HTTPContext)) {
+	m.Map(path, handler, []HTTPMethod{HTTPPost})
+}
+
+func (m *DefaultHTTPRequestDispatcher) Handle(ctx HTTPContext) {
+	for _, v := range m.handlers {
 		if v.MatchPath(ctx.Request) {
 			if v.MatchMethod(ctx.Request) {
 				getPathVars(&v, &ctx)
 				v.Handle(ctx)
-				return nil
+				return
 			} else {
-				methodNotMatch = true
+				ctx.Props["not_found_reason"] = "HTTP method dose not match"
+				return
 			}
 		}
 	}
+	ctx.Props["not_found_reason"] = "path dose not match"
+}
 
-	if methodNotMatch {
-		return errors.New("HTTP method dose not match")
+func checkConflict(handlers []RequestHandler, handler *RequestHandler) bool {
+	for _, h := range handlers {
+		if h.Conflict(handler) {
+			return true
+		}
 	}
-	return errors.New("path dose not match")
+	return false
+}
+
+func appendHandler(dp *DefaultHTTPRequestDispatcher, handler RequestHandler) {
+	dp.handlers = append(dp.handlers, handler)
 }
 
 func getPathVars(handler *RequestHandler, ctx *HTTPContext) {

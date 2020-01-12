@@ -1,42 +1,54 @@
 package pipeflow
 
 import (
-	"errors"
+	"net/http"
 	"reflect"
-	"strings"
 )
-import "net/http"
 
 // Flow is main service register center
 type Flow struct {
-	cors         func(ctx HTTPContext)
-	notfound     func(ctx HTTPContext)
-	handlers     []RequestHandler
-	middleware   []func(ctx HTTPContext, next func())
-	dispatcher   *HTTPRequestDispatcher
-	resource     map[string]interface{}
-	resourceType map[reflect.Type]interface{}
+	cors              func(ctx HTTPContext)
+	middleware        []func(ctx HTTPContext, next func())
+	postMiddleware    []func(ctx HTTPContext, next func())
+	resource          map[string]interface{}
+	resourceType      map[reflect.Type]interface{}
+	requestDispatcher HTTPRequestDispatcher
+	notFound          func(ctx HTTPContext, next func())
+	once              bool
+	init              bool
 }
 
 func (flow *Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
+	// Procedure
+	// middleware → http request dispatcher → post middleware
+	//                                                     ↓
+	// middleware ← http request dispatcher ← post middleware
 	ctx := HTTPContext{Request: res, ResponseWriter: writer, resource: flow.resource, resourceType: flow.resourceType, Props: map[string]interface{}{}}
+	if !flow.init {
+		// Add CORS to the pipeline
+		if flow.cors != nil {
+			flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
+				flow.cors(ctx)
+				next()
+			})
+		}
 
-	// Add CORS to the pipeline
-	if flow.cors != nil {
-		flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
-			flow.cors(ctx)
-			next()
-		})
-	}
+		if flow.requestDispatcher != nil {
+			flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
+				flow.requestDispatcher.Handle(ctx)
+				next()
+			})
+		}
 
-	// Add HTTP dispatcher
-	if flow.dispatcher != nil {
-		flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
-			if err := flow.dispatcher.Handle(ctx); err != nil && flow.notfound != nil {
-				ctx.Props["crash_reason"] = err.Error()
-				flow.notfound(ctx)
-			}
-		})
+		if flow.notFound != nil {
+			flow.postMiddleware = append(flow.postMiddleware, flow.notFound)
+		}
+
+		if flow.postMiddleware != nil {
+			flow.middleware = append(flow.middleware, flow.postMiddleware...)
+		}
+
+		flow.init = true
 	}
 
 	invoke(flow, ctx, 0)
@@ -54,12 +66,12 @@ func invoke(f *Flow, ctx HTTPContext, i int) {
 // NewFlow returns a new instance of pipeflow
 func NewFlow() *Flow {
 	flow := Flow{}
-	flow.handlers = []RequestHandler{}
 	flow.middleware = []func(ctx HTTPContext, next func()){}
-	flow.dispatcher = &HTTPRequestDispatcher{Handlers: &flow.handlers}
 	flow.resource = map[string]interface{}{}
 	flow.resourceType = map[reflect.Type]interface{}{}
-	flow.notfound = NotFoundMiddleware
+	flow.once = true
+	flow.requestDispatcher = NewDefaultRequestDispatcher()
+	flow.SetNotFound(NotFoundMiddleware)
 
 	return &flow
 }
@@ -73,8 +85,25 @@ func (flow *Flow) Use(middleware func(ctx HTTPContext, next func())) {
 
 // Run runnable typed middleware will always invoke next
 func (flow *Flow) Run(middleware func(ctx HTTPContext)) {
-	if nil != middleware {
-		flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
+	if middleware != nil {
+		flow.Use(func(ctx HTTPContext, next func()) {
+			middleware(ctx)
+			next()
+		})
+	}
+}
+
+// UsePost add middleware to invoke after HTTP request dispatcher
+func (flow *Flow) UsePost(middleware func(ctx HTTPContext, next func())) {
+	if middleware != nil {
+		flow.postMiddleware = append(flow.postMiddleware, middleware)
+	}
+}
+
+// RunPost add middleware must be invoked after HTTP request dispatcher
+func (flow *Flow) RunPost(middleware func(ctx HTTPContext)) {
+	if middleware != nil {
+		flow.UsePost(func(ctx HTTPContext, next func()) {
 			middleware(ctx)
 			next()
 		})
@@ -94,28 +123,30 @@ func (flow *Flow) UseCors(origins []string, methods []string, headers []string, 
 	}
 }
 
+func (flow *Flow) SetHTTPDispatcher(hd HTTPRequestDispatcher) {
+	if flow.once {
+		flow.requestDispatcher = hd
+	}
+}
+
+func (flow *Flow) SetNotFound(nf func(ctx HTTPContext)) {
+	if nf == nil {
+		flow.notFound = nil
+	} else {
+		flow.notFound = func(ctx HTTPContext, next func()) {
+			nf(ctx)
+			next()
+		}
+	}
+}
+
 // Map is used to add request handler
 func (flow *Flow) Map(path string, handler func(ctx HTTPContext), methods []HTTPMethod) {
-	path = strings.Trim(path, " ")
-	if "" == path || path[0] != '/' || nil == methods || len(methods) == 0 || nil == handler {
-		panic(errors.New("args given are not valid"))
+	if flow.requestDispatcher != nil {
+		flow.requestDispatcher.Map(path, handler, methods)
+		// Once Map has been called, the dispatcher cannot be replaced any more.
+		flow.once = false
 	}
-
-	route, err := BuildRoute(path)
-	if err != nil {
-		panic(err)
-	}
-
-	httpHandler := RequestHandler{Route: &route, Handle: handler, Methods: map[HTTPMethod]bool{}}
-	for _, v := range methods {
-		httpHandler.Methods[v] = true
-	}
-
-	if flow.checkConflict(&httpHandler) {
-		panic(errors.New("this handler conflicts with the existing one"))
-	}
-
-	flow.appendHandler(httpHandler)
 }
 
 func (flow *Flow) GET(path string, handler func(ctx HTTPContext)) {
@@ -150,19 +181,4 @@ func (flow *Flow) GetResource(key string) interface{} {
 // GetResourceByType gets global singleton resource preset by type
 func (flow *Flow) GetResourceByType(key reflect.Type) interface{} {
 	return flow.resourceType[key]
-}
-
-func (flow *Flow) checkConflict(handler *RequestHandler) bool {
-	for _, h := range flow.handlers {
-		if h.Conflict(handler) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (flow *Flow) appendHandler(handler RequestHandler) {
-	flow.handlers = append(flow.handlers, handler)
-	flow.dispatcher.Handlers = &flow.handlers
 }
