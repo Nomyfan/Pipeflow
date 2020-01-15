@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	flow := pipeflow.NewFlow()
+	flow := pipeflow.New()
 
 	flow.Run(func(ctx pipeflow.HTTPContext) {
 		fmt.Println("request URL: " + ctx.Request.RequestURI)
@@ -57,7 +57,7 @@ func main() {
 		var count, _ = client.Get("count").Int()
 		client.Set("count", count+1, -1)
 		_, _ = ctx.ResponseWriter.Write([]byte("hello"))
-	}, []pipeflow.HTTPMethod{pipeflow.HTTPPost, pipeflow.HTTPGet})
+	}, pipeflow.HTTPPost, pipeflow.HTTPGet)
 
 	flow.GET("/hello", func(ctx pipeflow.HTTPContext) {
 		var client1, _ = ctx.GetResource("redis").(*redis.Client)
