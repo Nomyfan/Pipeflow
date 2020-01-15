@@ -19,8 +19,6 @@ const (
 	HTTPPut
 	// HTTPDelete DELETE
 	HTTPDelete
-	// HTTPConnect CONNECT
-	HTTPConnect
 	// HTTPOptions OPTIONS
 	HTTPOptions
 	// HTTPTrace TRACE
@@ -77,8 +75,8 @@ func (h *RequestHandler) MatchPath(request *http.Request) bool {
 func (h *RequestHandler) MatchMethod(request *http.Request) bool {
 	method := request.Method
 
-	methods := []string{"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE"}
-	httpMethods := []HTTPMethod{HTTPGet, HTTPHead, HTTPPost, HTTPPut, HTTPDelete, HTTPConnect, HTTPOptions, HTTPTrace}
+	methods := []string{"GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "TRACE"}
+	httpMethods := []HTTPMethod{HTTPGet, HTTPHead, HTTPPost, HTTPPut, HTTPDelete, HTTPOptions, HTTPTrace}
 
 	method = strings.ToUpper(method)
 	httpMethod := -1

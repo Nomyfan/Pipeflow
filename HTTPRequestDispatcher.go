@@ -7,8 +7,6 @@ import (
 
 type HTTPRequestDispatcher interface {
 	Map(path string, handler func(ctx HTTPContext), methods []HTTPMethod)
-	GET(path string, handler func(ctx HTTPContext))
-	POST(path string, handler func(ctx HTTPContext))
 	Handle(ctx HTTPContext)
 }
 
@@ -41,14 +39,6 @@ func (m *DefaultHTTPRequestDispatcher) Map(path string, handler func(ctx HTTPCon
 	}
 
 	appendHandler(m, httpHandler)
-}
-
-func (m *DefaultHTTPRequestDispatcher) GET(path string, handler func(ctx HTTPContext)) {
-	m.Map(path, handler, []HTTPMethod{HTTPGet})
-}
-
-func (m *DefaultHTTPRequestDispatcher) POST(path string, handler func(ctx HTTPContext)) {
-	m.Map(path, handler, []HTTPMethod{HTTPPost})
 }
 
 func (m *DefaultHTTPRequestDispatcher) Handle(ctx HTTPContext) {

@@ -38,10 +38,10 @@ func (flow *Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
 				flow.requestDispatcher.Handle(ctx)
 				next()
 			})
-		}
-
-		if flow.notFound != nil {
-			flow.postMiddleware = append(flow.postMiddleware, flow.notFound)
+			// Only when there is a request handler, not found middleware has meaning.
+			if flow.notFound != nil {
+				flow.postMiddleware = append(flow.postMiddleware, flow.notFound)
+			}
 		}
 
 		if flow.postMiddleware != nil {
@@ -63,8 +63,8 @@ func invoke(f *Flow, ctx HTTPContext, i int) {
 	})
 }
 
-// NewFlow returns a new instance of pipeflow
-func NewFlow() *Flow {
+// New returns a new instance of pipeflow
+func New() *Flow {
 	flow := Flow{}
 	flow.middleware = []func(ctx HTTPContext, next func()){}
 	flow.resource = map[string]interface{}{}
@@ -123,12 +123,14 @@ func (flow *Flow) UseCors(origins []string, methods []string, headers []string, 
 	}
 }
 
+// SetHTTPDispatcher replaces default HTTP request handler. It can be nil.
 func (flow *Flow) SetHTTPDispatcher(hd HTTPRequestDispatcher) {
 	if flow.once {
 		flow.requestDispatcher = hd
 	}
 }
 
+// SetNotFound replaces the default not found middleware
 func (flow *Flow) SetNotFound(nf func(ctx HTTPContext)) {
 	if nf == nil {
 		flow.notFound = nil
@@ -155,6 +157,26 @@ func (flow *Flow) GET(path string, handler func(ctx HTTPContext)) {
 
 func (flow *Flow) POST(path string, handler func(ctx HTTPContext)) {
 	flow.Map(path, handler, []HTTPMethod{HTTPPost})
+}
+
+func (flow *Flow) HEAD(path string, handler func(ctx HTTPContext)) {
+	flow.Map(path, handler, []HTTPMethod{HTTPHead})
+}
+
+func (flow *Flow) PUT(path string, handler func(ctx HTTPContext)) {
+	flow.Map(path, handler, []HTTPMethod{HTTPPut})
+}
+
+func (flow *Flow) DELETE(path string, handler func(ctx HTTPContext)) {
+	flow.Map(path, handler, []HTTPMethod{HTTPDelete})
+}
+
+func (flow *Flow) OPTIONS(path string, handler func(ctx HTTPContext)) {
+	flow.Map(path, handler, []HTTPMethod{HTTPOptions})
+}
+
+func (flow *Flow) TRACE(path string, handler func(ctx HTTPContext)) {
+	flow.Map(path, handler, []HTTPMethod{HTTPTrace})
 }
 
 // SetResource sets global singleton resource
