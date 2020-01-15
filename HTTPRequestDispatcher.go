@@ -6,7 +6,7 @@ import (
 )
 
 type HTTPRequestDispatcher interface {
-	Map(path string, handler func(ctx HTTPContext), methods []HTTPMethod)
+	Map(path string, handler func(ctx HTTPContext), methods ...HTTPMethod)
 	Handle(ctx HTTPContext)
 }
 
@@ -18,7 +18,7 @@ func NewDefaultRequestDispatcher() *DefaultHTTPRequestDispatcher {
 	return &DefaultHTTPRequestDispatcher{handlers: []RequestHandler{}}
 }
 
-func (m *DefaultHTTPRequestDispatcher) Map(path string, handler func(ctx HTTPContext), methods []HTTPMethod) {
+func (m *DefaultHTTPRequestDispatcher) Map(path string, handler func(ctx HTTPContext), methods ...HTTPMethod) {
 	path = strings.Trim(path, " ")
 	if "" == path || path[0] != '/' || nil == methods || len(methods) == 0 || nil == handler {
 		panic(errors.New("args given are not valid"))

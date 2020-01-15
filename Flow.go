@@ -143,40 +143,40 @@ func (flow *Flow) SetNotFound(nf func(ctx HTTPContext)) {
 }
 
 // Map is used to add request handler
-func (flow *Flow) Map(path string, handler func(ctx HTTPContext), methods []HTTPMethod) {
+func (flow *Flow) Map(path string, handler func(ctx HTTPContext), methods ...HTTPMethod) {
 	if flow.requestDispatcher != nil {
-		flow.requestDispatcher.Map(path, handler, methods)
+		flow.requestDispatcher.Map(path, handler, methods...)
 		// Once Map has been called, the dispatcher cannot be replaced any more.
 		flow.once = false
 	}
 }
 
 func (flow *Flow) GET(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, []HTTPMethod{HTTPGet})
+	flow.Map(path, handler, HTTPGet)
 }
 
 func (flow *Flow) POST(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, []HTTPMethod{HTTPPost})
+	flow.Map(path, handler, HTTPPost)
 }
 
 func (flow *Flow) HEAD(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, []HTTPMethod{HTTPHead})
+	flow.Map(path, handler, HTTPHead)
 }
 
 func (flow *Flow) PUT(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, []HTTPMethod{HTTPPut})
+	flow.Map(path, handler, HTTPPut)
 }
 
 func (flow *Flow) DELETE(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, []HTTPMethod{HTTPDelete})
+	flow.Map(path, handler, HTTPDelete)
 }
 
 func (flow *Flow) OPTIONS(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, []HTTPMethod{HTTPOptions})
+	flow.Map(path, handler, HTTPOptions)
 }
 
 func (flow *Flow) TRACE(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, []HTTPMethod{HTTPTrace})
+	flow.Map(path, handler, HTTPTrace)
 }
 
 // SetResource sets global singleton resource
