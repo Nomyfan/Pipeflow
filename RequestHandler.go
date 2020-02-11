@@ -32,17 +32,17 @@ type RequestHandler struct {
 	Handle  func(ctx HTTPContext)
 }
 
-// Conflict checks handler's path equals to other's and HTTP methods have intersection
-func (h *RequestHandler) Conflict(other *RequestHandler) bool {
-	if h.Route.Equals(other.Route) {
-		return h.HasInterMethod(other)
+// conflict checks handler's path equals to other's and HTTP methods have intersection
+func (h *RequestHandler) conflict(other *RequestHandler) bool {
+	if h.Route.equals(other.Route) {
+		return h.hasInterMethod(other)
 	}
 
 	return false
 }
 
-// HasInterMethod checks whether http methods has intersection
-func (h *RequestHandler) HasInterMethod(other *RequestHandler) bool {
+// hasInterMethod checks whether http methods has intersection
+func (h *RequestHandler) hasInterMethod(other *RequestHandler) bool {
 	for k := range h.Methods {
 		if _, ok := other.Methods[k]; ok {
 			return true
@@ -52,8 +52,8 @@ func (h *RequestHandler) HasInterMethod(other *RequestHandler) bool {
 	return false
 }
 
-// MatchPath checks whether request path is matched
-func (h *RequestHandler) MatchPath(request *http.Request) bool {
+// matchPath checks whether request path is matched
+func (h *RequestHandler) matchPath(request *http.Request) bool {
 	path := request.URL.Path
 	if !h.Route.PathReg.MatchString(path) {
 		return false
@@ -71,8 +71,8 @@ func (h *RequestHandler) MatchPath(request *http.Request) bool {
 	return true
 }
 
-// MatchMethod checks whether request method is matched
-func (h *RequestHandler) MatchMethod(request *http.Request) bool {
+// matchMethod checks whether request method is matched
+func (h *RequestHandler) matchMethod(request *http.Request) bool {
 	method := request.Method
 
 	methods := []string{"GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "TRACE"}
@@ -88,7 +88,7 @@ func (h *RequestHandler) MatchMethod(request *http.Request) bool {
 	}
 
 	if -1 != httpMethod {
-		hasInter := h.HasInterMethod(&RequestHandler{Methods: map[HTTPMethod]bool{httpMethods[httpMethod]: true}})
+		hasInter := h.hasInterMethod(&RequestHandler{Methods: map[HTTPMethod]bool{httpMethods[httpMethod]: true}})
 		if !hasInter {
 			return false
 		}

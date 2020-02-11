@@ -13,8 +13,8 @@ type Route struct {
 	Vars    map[string]bool
 }
 
-// BuildRoute builds a route from given pattern
-func BuildRoute(pattern string) (Route, error) {
+// buildRoute builds a route from given pattern
+func buildRoute(pattern string) (Route, error) {
 	route := Route{}
 	err := parse(pattern, &route)
 
@@ -76,8 +76,8 @@ func parse(pattern string, route *Route) error {
 	return err
 }
 
-// Equals checks whether two routes are equaled
-func (route *Route) Equals(other *Route) bool {
+// equals checks whether two routes are equaled
+func (route *Route) equals(other *Route) bool {
 	if route.PathReg.String() != other.PathReg.String() {
 		return false
 	}

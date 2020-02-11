@@ -14,27 +14,27 @@ import (
 )
 
 func main() {
-	flow := pipeflow.New()
+	fb := pipeflow.NewBuilder()
 
-	flow.Run(func(ctx pipeflow.HTTPContext) {
+	fb.Run(func(ctx pipeflow.HTTPContext) {
 		fmt.Println("request URL: " + ctx.Request.RequestURI)
 	})
 
-	flow.UseCors([]string{"http://localhost:18080"}, nil, nil, nil)
+	fb.UseCors([]string{"http://localhost:18080"}, nil, nil, nil)
 
-	flow.Use(func(ctx pipeflow.HTTPContext, next func()) {
+	fb.Use(func(ctx pipeflow.HTTPContext, next func()) {
 		fmt.Println("first")
 		next()
 		fmt.Println("first post action")
 	})
 
-	flow.Use(func(ctx pipeflow.HTTPContext, next func()) {
+	fb.Use(func(ctx pipeflow.HTTPContext, next func()) {
 		fmt.Println("second")
 		next()
 		fmt.Println("second post action")
 	})
 
-	flow.Use(func(ctx pipeflow.HTTPContext, next func()) {
+	fb.Use(func(ctx pipeflow.HTTPContext, next func()) {
 		if token := ctx.Request.Header.Get("token"); token != "" {
 			next()
 		} else {
@@ -48,18 +48,18 @@ func main() {
 		panic(err)
 	}
 
-	// flow.SetResource("redis", redisClient)
-	// flow.SetResourceWithType(reflect.TypeOf(redisClient), redisClient)
-	flow.SetResourceAlsoWithType("redis", redisClient)
+	// fb.SetResource("redis", redisClient)
+	// fb.SetResourceWithType(reflect.TypeOf(redisClient), redisClient)
+	fb.SetResourceAlsoWithType("redis", redisClient)
 
-	flow.Map("/hey", func(ctx pipeflow.HTTPContext) {
+	fb.Map("/hey", func(ctx pipeflow.HTTPContext) {
 		var client, _ = ctx.GetResource("redis").(*redis.Client)
 		var count, _ = client.Get("count").Int()
 		client.Set("count", count+1, -1)
 		_, _ = ctx.ResponseWriter.Write([]byte("hello"))
 	}, pipeflow.HTTPPost, pipeflow.HTTPGet)
 
-	flow.GET("/hello", func(ctx pipeflow.HTTPContext) {
+	fb.GET("/hello", func(ctx pipeflow.HTTPContext) {
 		var client1, _ = ctx.GetResource("redis").(*redis.Client)
 		var client2 = ctx.GetResourceByType(reflect.TypeOf((*redis.Client)(nil))).(*redis.Client)
 		var count, _ = client1.Get("count").Int()
@@ -67,11 +67,11 @@ func main() {
 		_, _ = ctx.ResponseWriter.Write([]byte("hello"))
 	})
 
-	flow.POST("/{foo}/hello?id=?&name=?", func(ctx pipeflow.HTTPContext) {
+	fb.POST("/{foo}/hello?id=?&name=?", func(ctx pipeflow.HTTPContext) {
 		_, _ = fmt.Fprintln(ctx.ResponseWriter, "foo = "+ctx.Vars["foo"]+", id = "+ctx.Request.Form.Get("id")+", name = "+ctx.Request.Form.Get("name"))
 	})
 
-	_ = http.ListenAndServe(":8888", flow)
+	_ = http.ListenAndServe(":8888", fb.Build())
 }
 ```
 

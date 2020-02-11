@@ -14,7 +14,7 @@ type DefaultHTTPRequestDispatcher struct {
 	handlers []RequestHandler
 }
 
-func NewDefaultRequestDispatcher() *DefaultHTTPRequestDispatcher {
+func newDefaultHTTPRequestDispatcher() *DefaultHTTPRequestDispatcher {
 	return &DefaultHTTPRequestDispatcher{handlers: []RequestHandler{}}
 }
 
@@ -24,7 +24,7 @@ func (m *DefaultHTTPRequestDispatcher) Map(path string, handler func(ctx HTTPCon
 		panic(errors.New("args given are not valid"))
 	}
 
-	route, err := BuildRoute(path)
+	route, err := buildRoute(path)
 	if err != nil {
 		panic(err)
 	}
@@ -43,8 +43,8 @@ func (m *DefaultHTTPRequestDispatcher) Map(path string, handler func(ctx HTTPCon
 
 func (m *DefaultHTTPRequestDispatcher) Handle(ctx HTTPContext) {
 	for _, v := range m.handlers {
-		if v.MatchPath(ctx.Request) {
-			if v.MatchMethod(ctx.Request) {
+		if v.matchPath(ctx.Request) {
+			if v.matchMethod(ctx.Request) {
 				getPathVars(&v, &ctx)
 				v.Handle(ctx)
 				return
@@ -59,7 +59,7 @@ func (m *DefaultHTTPRequestDispatcher) Handle(ctx HTTPContext) {
 
 func checkConflict(handlers []RequestHandler, handler *RequestHandler) bool {
 	for _, h := range handlers {
-		if h.Conflict(handler) {
+		if h.conflict(handler) {
 			return true
 		}
 	}

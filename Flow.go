@@ -7,15 +7,9 @@ import (
 
 // Flow is main service register center
 type Flow struct {
-	cors              func(ctx HTTPContext)
-	middleware        []func(ctx HTTPContext, next func())
-	postMiddleware    []func(ctx HTTPContext, next func())
-	resource          map[string]interface{}
-	resourceType      map[reflect.Type]interface{}
-	requestDispatcher HTTPRequestDispatcher
-	notFound          func(ctx HTTPContext, next func())
-	once              bool
-	init              bool
+	middleware   []func(ctx HTTPContext, next func())
+	resource     map[string]interface{}
+	resourceType map[reflect.Type]interface{}
 }
 
 func (flow *Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
@@ -24,33 +18,6 @@ func (flow *Flow) ServeHTTP(writer http.ResponseWriter, res *http.Request) {
 	//                                                     ↓
 	// middleware ← http request dispatcher ← post middleware
 	ctx := HTTPContext{Request: res, ResponseWriter: writer, resource: flow.resource, resourceType: flow.resourceType, Props: map[string]interface{}{}}
-	if !flow.init {
-		// Add CORS to the pipeline
-		if flow.cors != nil {
-			flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
-				flow.cors(ctx)
-				next()
-			})
-		}
-
-		if flow.requestDispatcher != nil {
-			flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
-				flow.requestDispatcher.Handle(ctx)
-				next()
-			})
-			// Only when there is a request handler, not found middleware has meaning.
-			if flow.notFound != nil {
-				flow.postMiddleware = append(flow.postMiddleware, flow.notFound)
-			}
-		}
-
-		if flow.postMiddleware != nil {
-			flow.middleware = append(flow.middleware, flow.postMiddleware...)
-		}
-
-		flow.init = true
-	}
-
 	invoke(flow, ctx, 0)
 }
 
@@ -63,30 +30,75 @@ func invoke(f *Flow, ctx HTTPContext, i int) {
 	})
 }
 
-// New returns a new instance of pipeflow
-func New() *Flow {
-	flow := Flow{}
+type FlowBuilder struct {
+	flow              *Flow
+	cors              func(ctx HTTPContext)
+	notFound          func(ctx HTTPContext)
+	requestDispatcher HTTPRequestDispatcher
+	postMiddleware    []func(ctx HTTPContext, next func())
+	once              bool
+}
+
+// Build returns a flow instance
+func (fb *FlowBuilder) Build() *Flow {
+	flow := fb.flow
+	// Add CORS to the pipeline
+	if fb.cors != nil {
+		cors := fb.cors
+		flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
+			cors(ctx)
+			next()
+		})
+	}
+
+	if fb.requestDispatcher != nil {
+		rd := fb.requestDispatcher
+		flow.middleware = append(flow.middleware, func(ctx HTTPContext, next func()) {
+			rd.Handle(ctx)
+			next()
+		})
+		// Only when there is a request handler, not found middleware has meaning.
+		if fb.notFound != nil {
+			nf := fb.notFound
+			fb.postMiddleware = append(fb.postMiddleware, func(ctx HTTPContext, next func()) {
+				nf(ctx)
+				next()
+			})
+		}
+	}
+
+	if fb.postMiddleware != nil {
+		flow.middleware = append(flow.middleware, fb.postMiddleware...)
+	}
+
+	fb.cors = nil
+	fb.requestDispatcher = nil
+	fb.notFound = nil
+	fb.postMiddleware = nil
+	fb.flow = nil
+	return flow
+}
+
+func NewBuilder() *FlowBuilder {
+	flow := &Flow{}
 	flow.middleware = []func(ctx HTTPContext, next func()){}
 	flow.resource = map[string]interface{}{}
 	flow.resourceType = map[reflect.Type]interface{}{}
-	flow.once = true
-	flow.requestDispatcher = NewDefaultRequestDispatcher()
-	flow.SetNotFound(NotFoundMiddleware)
 
-	return &flow
+	return &FlowBuilder{flow: flow, requestDispatcher: newDefaultHTTPRequestDispatcher(), notFound: NotFoundMiddleware, once: true}
 }
 
 // Use registers middleware
-func (flow *Flow) Use(middleware func(ctx HTTPContext, next func())) {
+func (fb *FlowBuilder) Use(middleware func(ctx HTTPContext, next func())) {
 	if middleware != nil {
-		flow.middleware = append(flow.middleware, middleware)
+		fb.flow.middleware = append(fb.flow.middleware, middleware)
 	}
 }
 
 // Run runnable typed middleware will always invoke next
-func (flow *Flow) Run(middleware func(ctx HTTPContext)) {
+func (fb *FlowBuilder) Run(middleware func(ctx HTTPContext)) {
 	if middleware != nil {
-		flow.Use(func(ctx HTTPContext, next func()) {
+		fb.Use(func(ctx HTTPContext, next func()) {
 			middleware(ctx)
 			next()
 		})
@@ -94,16 +106,16 @@ func (flow *Flow) Run(middleware func(ctx HTTPContext)) {
 }
 
 // UsePost add middleware to invoke after HTTP request dispatcher
-func (flow *Flow) UsePost(middleware func(ctx HTTPContext, next func())) {
+func (fb *FlowBuilder) UsePost(middleware func(ctx HTTPContext, next func())) {
 	if middleware != nil {
-		flow.postMiddleware = append(flow.postMiddleware, middleware)
+		fb.postMiddleware = append(fb.postMiddleware, middleware)
 	}
 }
 
 // RunPost add middleware must be invoked after HTTP request dispatcher
-func (flow *Flow) RunPost(middleware func(ctx HTTPContext)) {
+func (fb *FlowBuilder) RunPost(middleware func(ctx HTTPContext)) {
 	if middleware != nil {
-		flow.UsePost(func(ctx HTTPContext, next func()) {
+		fb.UsePost(func(ctx HTTPContext, next func()) {
 			middleware(ctx)
 			next()
 		})
@@ -111,88 +123,81 @@ func (flow *Flow) RunPost(middleware func(ctx HTTPContext)) {
 }
 
 // UseCors registers CORS middleware
-func (flow *Flow) UseCors(origins []string, methods []string, headers []string, expose []string) {
+func (fb *FlowBuilder) UseCors(origins []string, methods []string, headers []string, expose []string) {
 	cors := Cors{AllowedOrigins: map[string]bool{}, AllowedMethods: methods, AllowedHeaders: headers, ExposedHeaders: expose}
 	if nil != origins {
 		for _, v := range origins {
 			cors.AllowedOrigins[v] = true
 		}
 	}
-	flow.cors = func(ctx HTTPContext) {
+	fb.cors = func(ctx HTTPContext) {
 		cors.Handle(ctx)
 	}
 }
 
 // SetHTTPDispatcher replaces default HTTP request handler. It can be nil.
-func (flow *Flow) SetHTTPDispatcher(hd HTTPRequestDispatcher) {
-	if flow.once {
-		flow.requestDispatcher = hd
+func (fb *FlowBuilder) SetHTTPDispatcher(hd HTTPRequestDispatcher) {
+	if fb.once {
+		fb.requestDispatcher = hd
 	}
 }
 
 // SetNotFound replaces the default not found middleware
-func (flow *Flow) SetNotFound(nf func(ctx HTTPContext)) {
-	if nf == nil {
-		flow.notFound = nil
-	} else {
-		flow.notFound = func(ctx HTTPContext, next func()) {
-			nf(ctx)
-			next()
-		}
-	}
+func (fb *FlowBuilder) SetNotFound(nf func(ctx HTTPContext)) {
+	fb.notFound = nf
 }
 
 // Map is used to add request handler
-func (flow *Flow) Map(path string, handler func(ctx HTTPContext), methods ...HTTPMethod) {
-	if flow.requestDispatcher != nil {
-		flow.requestDispatcher.Map(path, handler, methods...)
+func (fb *FlowBuilder) Map(path string, handler func(ctx HTTPContext), methods ...HTTPMethod) {
+	if fb.requestDispatcher != nil {
+		fb.requestDispatcher.Map(path, handler, methods...)
 		// Once Map has been called, the dispatcher cannot be replaced any more.
-		flow.once = false
+		fb.once = false
 	}
 }
 
-func (flow *Flow) GET(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, HTTPGet)
+func (fb *FlowBuilder) GET(path string, handler func(ctx HTTPContext)) {
+	fb.Map(path, handler, HTTPGet)
 }
 
-func (flow *Flow) POST(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, HTTPPost)
+func (fb *FlowBuilder) POST(path string, handler func(ctx HTTPContext)) {
+	fb.Map(path, handler, HTTPPost)
 }
 
-func (flow *Flow) HEAD(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, HTTPHead)
+func (fb *FlowBuilder) HEAD(path string, handler func(ctx HTTPContext)) {
+	fb.Map(path, handler, HTTPHead)
 }
 
-func (flow *Flow) PUT(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, HTTPPut)
+func (fb *FlowBuilder) PUT(path string, handler func(ctx HTTPContext)) {
+	fb.Map(path, handler, HTTPPut)
 }
 
-func (flow *Flow) DELETE(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, HTTPDelete)
+func (fb *FlowBuilder) DELETE(path string, handler func(ctx HTTPContext)) {
+	fb.Map(path, handler, HTTPDelete)
 }
 
-func (flow *Flow) OPTIONS(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, HTTPOptions)
+func (fb *FlowBuilder) OPTIONS(path string, handler func(ctx HTTPContext)) {
+	fb.Map(path, handler, HTTPOptions)
 }
 
-func (flow *Flow) TRACE(path string, handler func(ctx HTTPContext)) {
-	flow.Map(path, handler, HTTPTrace)
+func (fb *FlowBuilder) TRACE(path string, handler func(ctx HTTPContext)) {
+	fb.Map(path, handler, HTTPTrace)
 }
 
 // SetResource sets global singleton resource
-func (flow *Flow) SetResource(key string, value interface{}) {
-	flow.resource[key] = value
+func (fb *FlowBuilder) SetResource(key string, value interface{}) {
+	fb.flow.resource[key] = value
 }
 
 // SetResourceWithType sets global singleton resource using it's type as key
-func (flow *Flow) SetResourceWithType(key reflect.Type, value interface{}) {
-	flow.resourceType[key] = value
+func (fb *FlowBuilder) SetResourceWithType(key reflect.Type, value interface{}) {
+	fb.flow.resourceType[key] = value
 }
 
 // SetResourceAlsoWithType calls SetResource and SetResourceWithType
-func (flow *Flow) SetResourceAlsoWithType(key string, value interface{}) {
-	flow.SetResource(key, value)
-	flow.SetResourceWithType(reflect.TypeOf(value), value)
+func (fb *FlowBuilder) SetResourceAlsoWithType(key string, value interface{}) {
+	fb.SetResource(key, value)
+	fb.SetResourceWithType(reflect.TypeOf(value), value)
 }
 
 // GetResource gets global singleton resource preset
