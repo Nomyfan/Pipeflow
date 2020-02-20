@@ -25,26 +25,26 @@ const (
 	HTTPTrace
 )
 
-// RequestHandler is used to register a request handler
-type RequestHandler struct {
-	Route   *Route
-	Methods map[HTTPMethod]bool
-	Handle  func(ctx HTTPContext)
+// requestHandler is used to register a request handler
+type requestHandler struct {
+	route   *route
+	methods map[HTTPMethod]bool
+	handle  func(ctx HTTPContext)
 }
 
 // conflict checks handler's path equals to other's and HTTP methods have intersection
-func (h *RequestHandler) conflict(other *RequestHandler) bool {
-	if h.Route.equals(other.Route) {
-		return h.hasInterMethod(other)
+func conflict(h *requestHandler, other *requestHandler) bool {
+	if h.route.equals(other.route) {
+		return hasInterMethod(h, other)
 	}
 
 	return false
 }
 
 // hasInterMethod checks whether http methods has intersection
-func (h *RequestHandler) hasInterMethod(other *RequestHandler) bool {
-	for k := range h.Methods {
-		if _, ok := other.Methods[k]; ok {
+func hasInterMethod(h *requestHandler, other *requestHandler) bool {
+	for k := range h.methods {
+		if _, ok := other.methods[k]; ok {
 			return true
 		}
 	}
@@ -53,16 +53,27 @@ func (h *RequestHandler) hasInterMethod(other *RequestHandler) bool {
 }
 
 // matchPath checks whether request path is matched
-func (h *RequestHandler) matchPath(request *http.Request) bool {
-	path := request.URL.Path
-	if !h.Route.PathReg.MatchString(path) {
+func matchPath(h *requestHandler, request *http.Request) bool {
+
+	segments := splitPathIntoSegments(request.URL.Path)
+	if len(h.route.segments) != len(segments) {
 		return false
+	}
+	for i, v := range segments {
+		if !h.route.segments[i].isVar && h.route.segments[i].seg != v {
+			return false
+		}
 	}
 
-	if e := request.ParseForm(); e != nil {
+	if err := request.ParseForm(); err != nil {
 		return false
 	}
-	for k := range h.Route.Params {
+	if len(h.route.params) != len(request.Form) {
+		// TODO
+		//  or find the route with least params matching the request form
+		return false
+	}
+	for k := range h.route.params {
 		if _, ok := request.Form[k]; !ok {
 			return false
 		}
@@ -72,8 +83,7 @@ func (h *RequestHandler) matchPath(request *http.Request) bool {
 }
 
 // matchMethod checks whether request method is matched
-func (h *RequestHandler) matchMethod(request *http.Request) bool {
-	method := request.Method
+func matchMethod(h *requestHandler, method string) bool {
 
 	methods := []string{"GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "TRACE"}
 	httpMethods := []HTTPMethod{HTTPGet, HTTPHead, HTTPPost, HTTPPut, HTTPDelete, HTTPOptions, HTTPTrace}
@@ -88,7 +98,7 @@ func (h *RequestHandler) matchMethod(request *http.Request) bool {
 	}
 
 	if -1 != httpMethod {
-		hasInter := h.hasInterMethod(&RequestHandler{Methods: map[HTTPMethod]bool{httpMethods[httpMethod]: true}})
+		hasInter := hasInterMethod(h, &requestHandler{methods: map[HTTPMethod]bool{httpMethods[httpMethod]: true}})
 		if !hasInter {
 			return false
 		}

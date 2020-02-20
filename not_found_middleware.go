@@ -7,7 +7,7 @@ import (
 
 // NotFoundMiddleware handles not found case
 func NotFoundMiddleware(ctx HTTPContext) {
-	if prop, ok := ctx.Props["not_found_reason"]; ok {
+	if prop := ctx.Props["not_found_reason"]; prop != nil {
 		reason := prop.(string)
 		ctx.ResponseWriter.Header().Set("Content-Type", "text/html; charset=utf-8")
 		ctx.ResponseWriter.WriteHeader(http.StatusNotFound)

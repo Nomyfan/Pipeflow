@@ -67,7 +67,7 @@ func main() {
 		_, _ = ctx.ResponseWriter.Write([]byte("hello"))
 	})
 
-	fb.POST("/{foo}/hello?id=?&name=?", func(ctx pipeflow.HTTPContext) {
+	fb.GET("/{foo}/hello?id&name", func(ctx pipeflow.HTTPContext) {
 		_, _ = fmt.Fprintln(ctx.ResponseWriter, "foo = "+ctx.Vars["foo"]+", id = "+ctx.Request.Form.Get("id")+", name = "+ctx.Request.Form.Get("name"))
 	})
 

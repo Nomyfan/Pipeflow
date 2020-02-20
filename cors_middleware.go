@@ -12,7 +12,7 @@ type Cors struct {
 	ExposedHeaders []string
 }
 
-// Handle implements middleware
+// handle implements middleware
 func (cors *Cors) Handle(ctx HTTPContext) {
 	// Cors runs after any middleware and before dispatcher middleware
 	origin := ctx.Request.Header.Get("Origin")
@@ -26,7 +26,7 @@ func (cors *Cors) Handle(ctx HTTPContext) {
 	}
 	if enabled {
 		if nil != cors.AllowedMethods && 0 != len(cors.AllowedMethods) {
-			ctx.ResponseWriter.Header().Set("Access-Control-Allow-Methods", strings.Join(cors.AllowedMethods, ","))
+			ctx.ResponseWriter.Header().Set("Access-Control-Allow-methods", strings.Join(cors.AllowedMethods, ","))
 		}
 		if nil != cors.AllowedHeaders && 0 != len(cors.AllowedHeaders) {
 			ctx.ResponseWriter.Header().Set("Access-Control-Allow-Headers", strings.Join(cors.AllowedHeaders, ","))
