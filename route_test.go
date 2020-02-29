@@ -5,14 +5,14 @@ import (
 	"testing"
 )
 
-func shouldPanic() {
+func shouldPanic(t *testing.T) {
 	if r := recover(); r == nil {
-		panic(errors.New("should panic"))
+		t.Fatal(errors.New("should panic"))
 	}
 }
 
 func TestFlowBuilder_GET(t *testing.T) {
-	defer shouldPanic()
+	defer shouldPanic(t)
 
 	fb := NewBuilder()
 	fb.GET("/{foo}/{bar}/hello", func(ctx HTTPContext) {
